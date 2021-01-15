@@ -13,7 +13,6 @@ Given a query nucleotide sequence in a fasta file:
 """
 
 #Import necessary modules
-import re
 from Bio import AlignIO, Entrez, Phylo
 from Bio.Blast import NCBIWWW
 from Bio.Align.Applications import ClustalwCommandline
@@ -54,6 +53,7 @@ def blast_search(query_sequence, query_name):
     result_handle = NCBIWWW.qblast("blastn", "nt", query_sequence)
     print('BLAST query complete.')
     blast_results = result_handle.read()
+    result_handle.close()
     output_file = 'results_' + query_name + '.xml'
     with open(output_file, 'w') as save_file:
         save_file.write(blast_results)
@@ -104,7 +104,7 @@ def find_best_match(list_of_hits):
     if len(unique_genes) == 1:
         gene_output = unique_genes[0]
         print('Closest gene match: ' + gene_output)
-    else: #NEEDS TESTING - we need a query which outputs 2+ potential genes
+    else: #NEEDS TESTING - not sure about this section
         print('Multiple possible gene matches: ')
         print([gene for gene in unique_genes])
         gene_output = input('Please select one gene symbol: ')
@@ -114,22 +114,37 @@ def find_best_match(list_of_hits):
 
     return gene_output
 
-#Function 5: Identify gene orthologues and return protein sequences as .fasta
-def find_orthologues(gene_output):
+#Function 5: Identify gene homologues and return protein sequences as .fasta
+def find_homologues(gene_output):
     Entrez.email = 'jomiles26@googlemail.com'
     search_handle = Entrez.esearch(db='homologene', term=(gene_output + '[Gene Name] AND Homo sapiens[Organism]'))
     search_record = Entrez.read(search_handle)
+    search_handle.close()
 
-    record_handle = Entrez.efetch(db='homologene', id = search_record['IdList'], rettype = 'fasta', retmode='text')
-    record = record_handle.read()
-    first_seq = int(record.find('>'))
-    clipped_record = (record[first_seq:]).strip()
+    hg_id = search_record['IdList'][0]
+    print('Homologene ID: ' + hg_id)
 
-    output_file = gene_output + '_homologene.fasta'
-    with open(output_file, 'w') as output_object:
-        output_object.write(clipped_record)
+    hg_handle = Entrez.efetch(db='homologene', id = hg_id, rettype = 'homologene', retmode='text')
+    hg_record = hg_handle.readlines()
+    hg_handle.close()
+    accession_list = []
+    for line in hg_record:
+        line_strip = line.strip()
+        if line_strip[-3:] == ' aa':
+            accession = (line_strip.split(' '))[-2]
+            accession_list.append(accession)
+    print('Transcript accession numbers: ', [acs for acs in accession_list])
 
-    return output_file
+    fasta_handle = Entrez.efetch(db='homologene', id = hg_id, rettype = 'fasta', retmode='text')
+    fasta_record = fasta_handle.read()
+    fasta_handle.close()
+    first_seq = int(fasta_record.find('>'))
+    clipped_fasta_record = (fasta_record[first_seq:]).strip()
+    fasta_file = gene_output + '_hg.fasta'
+    with open(fasta_file, 'w') as output_object:
+        output_object.write(clipped_fasta_record)
+
+    return fasta_file
 
 #Function 7: Construct an MSA
 #def construct_MSA(fasta_transcripts):
@@ -145,7 +160,7 @@ def main():
     blast_output = blast_search(sequence, name)
     output_list = get_blast_hits(blast_output)
     gene_symbol = find_best_match(output_list)
-    find_orthologues(gene_symbol)
+    find_homologues(gene_symbol)
 
 #Call to main function
 if __name__ == '__main__':
