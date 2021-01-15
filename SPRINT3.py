@@ -14,9 +14,10 @@ Given a query nucleotide sequence in a fasta file:
 
 #Import necessary modules
 import re
+from Bio import AlignIO, Entrez, Phylo
 from Bio.Blast import NCBIWWW
+from Bio.Align.Applications import ClustalwCommandline
 import xml.etree.ElementTree as ET
-from Bio import Entrez, SeqIO #might not need this?
 
 #Function 1: Get query sequence from string or .fasta file
 def acquire_input():
@@ -58,7 +59,7 @@ def blast_search(query_sequence, query_name):
         save_file.write(blast_results)
     return output_file
 
-#Function 3: Extract relevant info for each BLAST hit
+#Function 3: Extract relevant info from BLAST output
 def get_blast_hits(filename):
     list_of_hits = []
     tree = ET.parse(filename)
@@ -94,30 +95,45 @@ def find_best_match(list_of_hits):
         gene_desc = hit[0]
         split1 = ((gene_desc.split('('))[1:])[0]
         split2 = (split1.split(')'))[:1]
-        gene_symbols.append([split2[0], hit[2]])
+        gene_symbols.append(split2[0])
 
     unique_genes = []
     for gene in gene_symbols:
-        if gene[0] not in unique_genes:
+        if gene not in unique_genes:
             unique_genes.append(gene)
     if len(unique_genes) == 1:
         gene_output = unique_genes[0]
-        print('Closest gene match: ' + gene_output[0])
-        print('Percent identity: ' + str(gene_output[1]))
+        print('Closest gene match: ' + gene_output)
     else: #NEEDS TESTING - we need a query which outputs 2+ potential genes
         print('Multiple possible gene matches: ')
         print([gene for gene in unique_genes])
-        selection = input('Please select one gene symbol: ')
-        while selection not in unique_genes:
+        gene_output = input('Please select one gene symbol: ')
+        while gene_output not in unique_genes:
             print('Selection must be in list above.')
-            selection = input('Please select one gene symbol: ')
-        gene_output = selection
+            gene_output = input('Please select one gene symbol: ')
 
     return gene_output
 
-#Function 5: Identify gene orthologues
-#Function 6: Get protein sequences into a single fasta
+#Function 5: Identify gene orthologues and return protein sequences as .fasta
+def find_orthologues(gene_output):
+    Entrez.email = 'jomiles26@googlemail.com'
+    search_handle = Entrez.esearch(db='homologene', term=(gene_output + '[Gene Name] AND Homo sapiens[Organism]'))
+    search_record = Entrez.read(search_handle)
+
+    record_handle = Entrez.efetch(db='homologene', id = search_record['IdList'], rettype = 'fasta', retmode='text')
+    record = record_handle.read()
+    first_seq = int(record.find('>'))
+    clipped_record = (record[first_seq:]).strip()
+
+    output_file = gene_output + '_homologene.fasta'
+    with open(output_file, 'w') as output_object:
+        output_object.write(clipped_record)
+
+    return output_file
+
 #Function 7: Construct an MSA
+#def construct_MSA(fasta_transcripts):
+    #cline = ClustalwCommandline("clustalw2", infile = fasta_transcripts) #clustalW needs local installation or api...
 
 
 example_sequence = "GCTGTTCAGCGTTCTGCTGGAGCAGGGCCCCGGACGGCCAGGCGACGCCCCGCACACCGG" #from CACNA1F
@@ -126,9 +142,10 @@ test_string = "  gCTGTTCAGCGTTCTGCtggAGCa GGGCEFCGGACGGCCAGGCGAC  GCCCCICACACCgg
 #Main function to call other functions
 def main():
     sequence, name = acquire_input()
-    #blast_output = blast_search(sequence, name)
-    #output_list = get_blast_hits('results_MAGI1.xml')
-    #find_best_match(output_list)
+    blast_output = blast_search(sequence, name)
+    output_list = get_blast_hits(blast_output)
+    gene_symbol = find_best_match(output_list)
+    find_orthologues(gene_symbol)
 
 #Call to main function
 if __name__ == '__main__':
