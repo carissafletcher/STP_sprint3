@@ -22,7 +22,7 @@ sequence_data = "GCTGTTCAGCGTTCTGCTGGAGCAGGGCCCCGGACGGCCAGGCGACGCCCCGCACACCGG"
 
 #Get query sequence into .fasta format
 def acquire_input():
-    request_text = 'Sequence format is (1) string (2) fasta file: '
+    request_text = 'Sequence format is (1) string (2) fasta file? '
     input_type = input(request_text)
     while not ((input_type == 1) or (input_type == 2)):
         print('Please enter either 1 or 2.')
@@ -71,4 +71,7 @@ def get_hit_list(raw_blast_output):
 
 
 
-blast_search(sequence_data)
+sequence = acquire_input()
+blast_output = blast_search(sequence)
+output_list = get_hit_list(blast_output)
+print(output_list)
