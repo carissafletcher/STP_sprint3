@@ -42,6 +42,8 @@ def acquire_input():
         print(query_sequence)
 
     query_name = input('Please enter a name for this query: ')
+    while not query_name:
+        query_name = input('Please enter a name for this query: ')
     return query_sequence, query_name
 
 #Function 2: Perform blastn search on query sequence, get XML output
@@ -75,14 +77,13 @@ def get_blast_hits(filename):
     print('There are ' + str(len(list_of_hits)) + ' sequence matches.')
     return list_of_hits
 
-#Function 4: Find sequence match with highest % identity
+#Function 4: Find sequence match with highest % identity and get gene symbol
 def find_best_match(list_of_hits):
     current_best = 0
     best_matches = []
     for hit in list_of_hits:
         if hit[2] > current_best:
             current_best = hit[2]
-
     for hit in list_of_hits:
         if hit[2] == current_best:
             best_matches.append(hit)
@@ -92,14 +93,16 @@ def find_best_match(list_of_hits):
         gene_desc = hit[0]
         split1 = ((gene_desc.split('('))[1:])[0]
         split2 = (split1.split(')'))[:1]
-        gene_symbols.append(split2)
+        gene_symbols.append([split2[0], hit[2]])
 
     unique_genes = []
     for gene in gene_symbols:
-        if gene not in unique_genes:
+        if gene[0] not in unique_genes:
             unique_genes.append(gene)
     if len(unique_genes) == 1:
-        gene_output = unique_genes[0][0]
+        gene_output = unique_genes[0]
+        print('Closest gene match: ' + gene_output[0])
+        print('Percent identity: ' + str(gene_output[1]))
     else: #NEEDS TESTING - we need a query which outputs 2+ potential genes
         print('Multiple possible gene matches: ')
         print([gene for gene in unique_genes])
@@ -109,7 +112,6 @@ def find_best_match(list_of_hits):
             selection = input('Please select one gene symbol: ')
         gene_output = selection
 
-    print(gene_output)
     return gene_output
 
 #Function 5: Identify gene orthologues
@@ -121,9 +123,9 @@ example_sequence = "GCTGTTCAGCGTTCTGCTGGAGCAGGGCCCCGGACGGCCAGGCGACGCCCCGCACACCGG
 
 #Main function to call other functions
 def main():
-    sequence, name = acquire_input()
-    blast_output = blast_search(sequence, name)
-    output_list = get_blast_hits(blast_output)
+    #sequence, name = acquire_input()
+    #blast_output = blast_search(sequence, name)
+    output_list = get_blast_hits('results_MAGI1.xml')
     find_best_match(output_list)
 
 #Call to main function
