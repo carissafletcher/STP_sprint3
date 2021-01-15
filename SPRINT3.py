@@ -26,12 +26,13 @@ def acquire_input():
         input_type = input('Sequence format is (1) string (2) fasta file? ')
 
     if input_type == '1':
-        query_sequence = input('Paste sequence here: ')
-        ((query_sequence.replace(' ', '')).strip()).upper() #NEED TO TEST
+        string_input = (input('Paste sequence here: ')).upper()
+        query_sequence = (string_input.replace(' ', '')).strip()
+        print('Sequence to query: ' + query_sequence)
         ok_input = ['A', 'B', 'C', 'D', 'G', 'H', 'K', 'M', 'N', 'R', 'S', 'T', 'U', 'V', 'W', 'Y', '-']
         for character in query_sequence:
             if character not in ok_input:
-                print('Warning, unsupported character: ' + character) #NEED TO TEST
+                print('Warning, unsupported character: ' + character) #warning only, stills runs query
 
     elif input_type == '2':
         filename = input('Enter filename: ')
@@ -120,13 +121,14 @@ def find_best_match(list_of_hits):
 
 
 example_sequence = "GCTGTTCAGCGTTCTGCTGGAGCAGGGCCCCGGACGGCCAGGCGACGCCCCGCACACCGG" #from CACNA1F
+test_string = "  gCTGTTCAGCGTTCTGCtggAGCa GGGCEFCGGACGGCCAGGCGAC  GCCCCICACACCgg " #some gaps, lowercase, and unsupported characters
 
 #Main function to call other functions
 def main():
-    #sequence, name = acquire_input()
+    sequence, name = acquire_input()
     #blast_output = blast_search(sequence, name)
-    output_list = get_blast_hits('results_MAGI1.xml')
-    find_best_match(output_list)
+    #output_list = get_blast_hits('results_MAGI1.xml')
+    #find_best_match(output_list)
 
 #Call to main function
 if __name__ == '__main__':
