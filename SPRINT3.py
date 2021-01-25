@@ -13,12 +13,13 @@ Given a query nucleotide sequence in a fasta file:
 """
 
 #Import necessary modules
+import requests
+import time
+import xml.etree.ElementTree as ET
+
 from Bio import AlignIO, Entrez, Phylo
 from Bio.Blast import NCBIWWW
 from Bio.Align.Applications import ClustalwCommandline
-import xml.etree.ElementTree as ET
-import requests
-import time
 
 #Function 1: Get query sequence from string or .fasta file
 def acquire_input():
@@ -148,13 +149,13 @@ def find_homologues(gene_output):
 
     return clipped_fasta_record
 
-#Function 7: Construct an MSA
+#Function 7: Construct an MSA using Clustal Omega
 def construct_MSA(fasta_transcripts, gene_symbol):
     
-    email_address = input("Please enter email address: ")
+    email_address = input("Please enter a valid email address: ")
     while "@" not in email_address:
-        print("email address is mandatory to access services")
-        email_address = input("Please enter email address: ")
+        print("Web API requires a valid email address.")
+        email_address = input("Please enter a valid email address: ")
 
     run = requests.post('https://www.ebi.ac.uk/Tools/services/rest/clustalo/run', data = {'email':email_address, 'sequence':fasta_transcripts})
     job_id_bytes = run.content
@@ -187,8 +188,6 @@ def construct_MSA(fasta_transcripts, gene_symbol):
         phylo_file_object.write(phylo)
 
     return msa, phylo
-    
-
 
 example_sequence = "GCTGTTCAGCGTTCTGCTGGAGCAGGGCCCCGGACGGCCAGGCGACGCCCCGCACACCGG" #from CACNA1F
 test_string = "  gCTGTTCAGCGTTCTGCtggAGCa GGGCEFCGGACGGCCAGGCGAC  GCCCCICACACCgg " #some gaps, lowercase, and unsupported characters
