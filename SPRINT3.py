@@ -17,6 +17,8 @@ from Bio import AlignIO, Entrez, Phylo
 from Bio.Blast import NCBIWWW
 from Bio.Align.Applications import ClustalwCommandline
 import xml.etree.ElementTree as ET
+import requests
+import time
 
 #Function 1: Get query sequence from string or .fasta file
 def acquire_input():
@@ -144,11 +146,48 @@ def find_homologues(gene_output):
     with open(fasta_file, 'w') as output_object:
         output_object.write(clipped_fasta_record)
 
-    return fasta_file
+    return clipped_fasta_record
 
 #Function 7: Construct an MSA
-#def construct_MSA(fasta_transcripts):
-    #cline = ClustalwCommandline("clustalw2", infile = fasta_transcripts) #clustalW needs local installation or api...
+def construct_MSA(fasta_transcripts, gene_symbol):
+    
+    email_address = input("Please enter email address: ")
+    while "@" not in email_address:
+        print("email address is mandatory to access services")
+        email_address = input("Please enter email address: ")
+
+    run = requests.post('https://www.ebi.ac.uk/Tools/services/rest/clustalo/run', data = {'email':email_address, 'sequence':fasta_transcripts})
+    job_id_bytes = run.content
+    job_id = job_id_bytes.decode('utf-8')
+
+    status = requests.get('https://www.ebi.ac.uk/Tools/services/rest/clustalo/status/'+ str(job_id))
+    status_bytes = status.content
+    status_decoded = status_bytes.decode('utf-8')
+
+    while status_decoded != "FINISHED":
+        status = requests.get('https://www.ebi.ac.uk/Tools/services/rest/clustalo/status/'+ str(job_id))
+        status_bytes = status.content
+        status_decoded = status_bytes.decode('utf-8')
+        print(status_decoded)
+        if status_decoded == "RUNNING":
+            time.sleep(10)
+
+    msa_request = requests.get('https://www.ebi.ac.uk/Tools/services/rest/clustalo/result/'+ str(job_id) +'/aln-clustal_num')
+    msa_bytes = msa_request.content
+    msa = msa_bytes.decode('utf-8')
+    msa_file = gene_symbol + '_msa.fasta'
+    with open(msa_file, 'w') as msa_file_object:
+        msa_file_object.write(msa)
+
+    phylo_request = requests.get('https://www.ebi.ac.uk/Tools/services/rest/clustalo/result/'+ str(job_id) +'/phylotree')
+    phylo_bytes = phylo_request.content
+    phylo = phylo_bytes.decode('utf-8')
+    phylo_file = gene_symbol + '_phylo.txt'
+    with open(phylo_file, 'w') as phylo_file_object:
+        phylo_file_object.write(phylo)
+
+    return msa, phylo
+    
 
 
 example_sequence = "GCTGTTCAGCGTTCTGCTGGAGCAGGGCCCCGGACGGCCAGGCGACGCCCCGCACACCGG" #from CACNA1F
@@ -160,7 +199,8 @@ def main():
     blast_output = blast_search(sequence, name)
     output_list = get_blast_hits(blast_output)
     gene_symbol = find_best_match(output_list)
-    find_homologues(gene_symbol)
+    fasta_transcripts = find_homologues(gene_symbol)
+    construct_MSA(fasta_transcripts, gene_symbol)
 
 #Call to main function
 if __name__ == '__main__':
