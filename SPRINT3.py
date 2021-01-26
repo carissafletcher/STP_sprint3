@@ -1,3 +1,5 @@
+#!/c/Users/Jay/anaconda3/python
+
 """
 Introduction to Programming - SPRINT3 Paired Coding Project
 Thomas Scott-Adams :  9627185
@@ -5,28 +7,36 @@ Jay Miles          : 10806682
 
 Given a query nucleotide sequence in a fasta file:
 
-1. Get query name from user input, create a new folder (and check that the query name has not previously been used).
-2. Get input: nucleotide sequence as string or fasta file.
-3. If a file is inputted, determine if it is a .fasta file and that it is formatted correctly. 
-4. Query BLASTN with the sequence using NCBIWWW from Biopython.
-5. Extract relevant information from BLASTN XML output (Gene names, Accession Numbers, Percentage Identities).
-6. Identify best sequence match and corresponding gene symbol based on highest percentage identity.
-7. Identify gene orthologues and obtain their protein sequences by sending a requests to NCBI's Homologene database.
-8. Reformat homologues fasta file to include species name in sequence descriptor.
-9. Construct a multiple sequence alignment and return alignment text file.
+1. Get user-defined query name, create new directory for output.
+2. Get user-defined nucleotide sequence as string or fasta file.
+3. Confirm that any .fasta file is of the correct format.
+4. Submit sequence to BLASTN using Biopython NCBIWWW.
+5. Extract relevant information from BLASTN XML output.
+6. Identify closest sequence match and corresponding gene symbol.
+7. Identify homologous protein sequences using Homologene API.
+8. Format homologous protein sequences as a .fasta file.
+9. Construct a multiple sequence alignment using Clustal Omega.
 """
 
-#Import necessary modules
-import os
-import requests
-import time
-import xml.etree.ElementTree as ET
+import os  # For management of input and output files
+import time  # To enable time delay between query status checks
+import xml.etree.ElementTree as ET  # To enable .xml manipulation
+import requests  # To query web services
 
-from Bio import Entrez, Phylo, SeqIO
-from Bio.Blast import NCBIWWW
+from Bio import Entrez, SeqIO  # To get NCBI records and manipulate sequences
+from Bio.Blast import NCBIWWW  # To query NCBI BLAST
 
-#Function 1: Get query name and make a new diectory to store output files
+
 def get_query_name():
+    """User inputs a name for the query. A new directory is created to
+    store file outputs of the program. The directory is named based on
+    the user input.
+
+    Returns:
+        query_name [string]: User-defined name associated with the query.
+        path_name [file path]: Path to new directory.
+    """
+    # User defines a name for the query
     query_name = input('Please enter a name for this query: ')
     while not query_name:
         query_name = input('Please enter a name for this query: ')
@@ -34,7 +44,7 @@ def get_query_name():
     current_dir = os.getcwd()
     path_name = current_dir + '/' + query_name
 
-    #Check if directory exists, if it does, the user will be prompted to input a new query name. the new directory is then made.
+    # Create a new folder using the query name (must be unique)
     sentry = False
     while sentry == False:
         if not os.path.exists(path_name):
@@ -47,30 +57,56 @@ def get_query_name():
         
     return query_name, path_name
 
-#Function 2: Function to check whether a file is in fasta format
+
 def fasta_check(filename):
+    """Checks whether the specified file is in FASTA format. If the file is
+    in FASTA format, SeqIO will be able to parse it as a FASTA file. If not,
+    the 'fasta' variable will be empty.
+
+    Args:
+        filename ([string]): Name of file to evaluate.
+
+    Returns:
+        [bool]: False if the specified file is not in FASTA format.
+    """
     with open(filename, "r") as handle:
         fasta = SeqIO.parse(handle, "fasta")
-    return any(fasta)
+        if any(fasta):
+            return True
+        else:
+            return False
 
-#Function 3: Get query sequence from string or .fasta file
+
 def acquire_input():
+    """User inputs a query sequence, either by direct entry of a string or by
+    specifying an existing FASTA file. If a file is specified, the contents
+    are read and stored for subsequent use.
+
+    Returns:
+        query_sequence [string]: Sequence to be queried using BLASTN.
+    """
+    # User specifies format of query sequence
     input_type = input('DNA sequence format is (1) string (2) fasta file? ')
     while not ((input_type == '1') or (input_type == '2')):
         print('Please enter either 1 or 2.')
         input_type = input('DNA sequence format is (1) string (2) fasta file? ')
 
-    # For direct sequence entry
+    # Format a directly-input sequence
     if input_type == '1':
         string_input = (input('Paste sequence here: ')).upper()
         query_sequence = (string_input.replace(' ', '')).strip()
         print('Sequence to query: ' + query_sequence)
-        ok_input = ['A', 'B', 'C', 'D', 'G', 'H', 'K', 'M', 'N', 'R', 'S', 'T', 'U', 'V', 'W', 'Y', '-']
+
+        ok_input = [
+            'A', 'B', 'C', 'D', 'G', 'H', 'K', 'M', 'N', 'R',
+            'S', 'T', 'U', 'V', 'W', 'Y', '-'
+            ]  # Characters comprising the degenerate nucleotide code
         for character in query_sequence:
             if character not in ok_input:
-                print('Warning, unsupported character: ' + character) #warning only, stills runs query
+                print('Warning, unsupported character: ' + character)  
+                # Warning only, stills runs query
 
-    # For FASTA file entry, check file extension and format is correct, if not, a different file must be inputted
+    # Check correct file extension/format for a sequence in a .fasta file
     elif input_type == '2':
         filename = input('Enter filename: ')
         while not (filename.endswith('.fasta')):
@@ -79,30 +115,63 @@ def acquire_input():
         while fasta_check(filename) == False:
             print('Data must be in fasta format.')
             filename = input('Enter filename: ')
-        query_sequence = open(filename).read()
+        with open(filename,'r') as file_object:
+            query_sequence = file_object.read()
 
     return query_sequence
 
-#Function 4: Perform blastn search on query sequence, get XML output
-def blast_search(query_sequence, query_name, path_name):
+
+def blast_search(query_name, path_name, query_sequence):
+    """Submit a query nucleotide sequence to BLASTN, and output the raw data
+    as an .xml file.
+
+    Args:
+        query_sequence ([string]): Nucleotide sequence to submit to BLASTN.
+        query_name ([string]): User-defined name for query.
+        path_name ([file path]): Directory to store output file in.
+
+    Returns:
+        output_path [file path]: Path to output .xml file.
+    """
+    # Submit query sequence to NCBI BLASTN and read results
     print('Querying BLAST - This may take several minutes during peak times.')
     result_handle = NCBIWWW.qblast("blastn", "nt", query_sequence)
     print('BLAST query complete.')
     blast_results = result_handle.read()
     result_handle.close()
+
+    # Define file path for output file
     output_file = query_name + '_blast_output.xml'
     output_path = os.path.join(path_name, output_file)
+
+    # Write output file
     with open(output_path, 'w') as save_file:
         save_file.write(blast_results)
     print("BLAST output xml file created.")
+
     return output_path
 
-#Function 5: Extract relevant info from BLAST output as a list of BLAST hits with gene name, accession no. and percent identity
-def get_blast_hits(filename):
-    list_of_hits = []
-    tree = ET.parse(filename)
+
+def get_blast_hits(filepath):
+    """Process raw BLASTN output from an .xml file to identify the gene 
+    description, transcript accession, and sequence identity associated with 
+    each potential sequence match.
+
+    Args:
+        filepath ([file path]): .xml file containing raw BLASTN output
+
+    Returns:
+        blast_closest_hits [list]: Each list element contains the gene 
+        description, transcript accession, and sequence identity associated 
+        with a potential sequence match.
+    """
+    # Parse the .xml output from BLASTN into a tree
+    blast_closest_hits = []
+    tree = ET.parse(filepath)
     root = tree.getroot()
 
+    # Use the tree to get the gene description, transcript accession and 
+    # sequence identity for each hit
     for hit in root.iter('Hit'):
         gene_description = hit.find('Hit_def').text
         transcript = hit.find('Hit_accession').text
@@ -110,65 +179,109 @@ def get_blast_hits(filename):
         length = int(hit.find('Hit_len').text)
         for hsp in hit.iter('Hsp'):
             identity = int(hsp.find('Hsp_identity').text)
-        percent_identity = 100*(identity/length)
+        percent_identity = 100 * (identity / length)
 
-        list_of_hits.append([gene_description, transcript, percent_identity])
+        blast_closest_hits.append([gene_description, transcript, percent_identity])
 
-    print('There are ' + str(len(list_of_hits)) + ' sequence matches.')
-    return list_of_hits
+    print('There are ' + str(len(blast_closest_hits)) + ' sequence matches.')
 
-#Function 6: Find sequence match with highest % identity and get gene symbol
-def find_best_match(list_of_hits):
+    return blast_closest_hits
+
+
+def find_best_match(blast_closest_hits):
+    """Identify which list item has the highest sequence identity with the 
+    query sequence, and return its associated gene symbol. If multiple 
+    sequences share the highest identity, create a list of gene symbols and 
+    determine whether they are duplicates.
+
+    Args:
+        blast_closest_hits ([list]): Each list element contains the gene 
+        description, transcript accession, and sequence identity associated 
+        with a potential sequence match.
+
+    Returns:
+        gene_symbol [string]: Gene symbol associated with the transcript(s)
+        whose sequences most closely match that of the query sequence.
+    """
+    # First, find the hit with the highest sequence identity.
+    # hit[2] contains sequence identity.
     current_best = 0
     best_matches = []
-    for hit in list_of_hits:
-        if hit[2] > current_best:          #hit[2] refers to % identity of a given BLAST hit
+    for hit in blast_closest_hits:
+        if hit[2] > current_best:
             current_best = hit[2]
-    for hit in list_of_hits:
+    for hit in blast_closest_hits:
         if hit[2] == current_best:
             best_matches.append(hit)
     
-    # Collects gene symbol(s) for BLAST hit(s) with greatest % identity
-    gene_symbols = []                             
+    # Format the gene descriptions of these hits to get their gene symbol
+    blast_genes = []                             
     for hit in best_matches:
         gene_desc = hit[0]
-        split1 = ((gene_desc.split('('))[1:])[0]
-        split2 = (split1.split(')'))[:1]
-        gene_symbols.append(split2[0])
+        split1 = gene_desc.split('(')
+        split2 = split1[1:]  # take everything after brackets open
+        split3 = split2[0]  # in case of multiple pairs of brackets
+        split4 = split3.split(')')
+        split5 = split4[:1]  # keep only contents before brackets close
+        blast_genes.append(split5[0])
 
-    #removes duplicate gene symbols from list of gene symbols.
+    # Remove duplicate gene symbols from the list
     unique_genes = []
-    for gene in gene_symbols:
+    for gene in blast_genes:
         if gene not in unique_genes:
             unique_genes.append(gene)
+
+    #  If there's only one unique gene symbol, that's the best match
     if len(unique_genes) == 1:
-        gene_output = unique_genes[0]
-        print('Closest gene match: ' + gene_output)
-    #if multple gene symbols are with the list, the user can select the most appropriate
+        gene_symbol = unique_genes[0]
+        print('Closest gene match: ' + gene_symbol)
+
+    # Otherwise, the user has to select a gene symbol
     else:
         print('Multiple possible gene matches: ')
         print([gene for gene in unique_genes])
-        gene_output = input('Please select one gene symbol: ')
-        while gene_output not in unique_genes:
+        gene_symbol = input('Please select one gene symbol: ')
+        while gene_symbol not in unique_genes:
             print('Selection must be in list above.')
-            gene_output = input('Please select one gene symbol: ')
+            gene_symbol = input('Please select one gene symbol: ')
 
-    return gene_output
+    return gene_symbol
 
-#Function 7: Identify gene homologues and return protein sequences as .fasta
-def find_homologues(gene_output):
-    #Search homologene database using gene symbol and Homo sapiens as search terms and retrieve homologene ID
+
+def find_homologues(email_address, gene_symbol):
+    """Identify gene homologues and associated protein sequences in multiple 
+    species using Homologene. Output one protein sequence from each species in
+    FASTA format.
+
+    Args:
+        gene_symbol ([string]): Gene symbol associated with the transcript(s)
+        whose sequences most closely match that of the query sequence.
+
+    Returns:
+        fasta_record [homologene record]: Sequences of protein homologues in 
+        FASTA format.
+    """
+    # Query Homologene with the gene symbol for the best match
     Entrez.email = email_address
-    search_handle = Entrez.esearch(db='homologene', term=(gene_output + '[Gene Name] AND Homo sapiens[Organism]'))
+    search_handle = Entrez.esearch(
+        db='homologene', 
+        term=(gene_symbol + '[Gene Name] AND Homo sapiens[Organism]')
+        )
     search_record = Entrez.read(search_handle)
     search_handle.close()
+
+    # Extract the Homologene ID
     hg_id = search_record['IdList'][0]
     print('Homologene ID: ' + hg_id)
 
-    #Search Homologene using ID number and get list of homologous protein sequence accession numbers
-    hg_handle = Entrez.efetch(db='homologene', id = hg_id, rettype = 'homologene', retmode='text')
+    # Use the ID to request the Homologene record
+    hg_handle = Entrez.efetch(
+        db='homologene', id = hg_id, rettype = 'homologene', retmode='text'
+        )
     hg_record = hg_handle.readlines()
     hg_handle.close()
+
+    # Format the record to extract list of protein homologue accession numbers
     accession_list = []
     for line in hg_record:
         line_strip = line.strip()
@@ -177,113 +290,174 @@ def find_homologues(gene_output):
             accession_list.append(accession)
     print('Transcript accession numbers: ', [acs for acs in accession_list])
 
-    #Search Homologene using ID number and get homologue sequences in FASTA format
-    fasta_handle = Entrez.efetch(db='homologene', id = hg_id, rettype = 'fasta', retmode='text')
+    # Use the ID again to request the homologous protein sequences as .fasta
+    fasta_handle = Entrez.efetch(
+        db='homologene', id = hg_id, rettype = 'fasta', retmode='text'
+        )
     fasta_record = fasta_handle.read()
     fasta_handle.close()
 
-    return fasta_record, email_address
+    return fasta_record
 
-#Function 8: Format fasta file with species names
-def format_fasta(gene_output, fasta_record, path_name):
+
+def format_fasta(path_name, gene_symbol, fasta_record):
+    """Format the FASTA file from Homologene so that each header contains
+    the species name, transcript accession, and protein description.
+
+    Args:
+        gene_symbol ([string]): Gene symbol associated with the transcript(s)
+        whose sequences most closely match that of the query sequence.
+        fasta_record ([Homologene record]): FASTA record of homologous protein
+        sequences from Homologene.
+        path_name ([file path]): Path to directory where output .fasta file 
+        will be stored.
+
+    Returns:
+        homologues_path [file path]: Path to the output .fasta file.
+    """
+    # Identify the start of the first protein sequence header and remove 
+    # everything preceding it
     first_seq = int(fasta_record.find('>'))
     clipped_fasta_record = (fasta_record[first_seq:]).strip()
-    fasta_file = gene_output + '_raw_homologues.fasta'
+    fasta_file = gene_symbol + '_raw_homologues.fasta'
     
-    #creating raw homologues fasta file
+    # Get the fasta file from a single string into a list of lines. This is 
+    # a REALLY clunky way of doing this, but it works whilst we think of a 
+    # better option.
     og_fasta_path = os.path.join(path_name, fasta_file)
     with open(og_fasta_path, 'w') as output_object:
         output_object.write(clipped_fasta_record)
     with open(og_fasta_path, 'r') as input_object:
         fasta_homologues = input_object.readlines()
-    print("Raw Homologues fasta file created.")
+    print("Raw homologues fasta file created.")
 
-    #identify species associated with each homologous protein sequence and format into fasta headers
+    # For each sequence in the .fasta file, extract the accession number. Use
+    # this to get the relevant organism with efetch. 
     i = 0
     for line in fasta_homologues:
         if line[0] == '>':
             split_line = line.split('|')
-            handle = Entrez.efetch(db="protein", id=split_line[3], rettype="gb", retmode="text")
+            handle = Entrez.efetch(
+                db="protein", id=split_line[3], rettype="gb", retmode="text"
+                )
             record = SeqIO.read(handle, "gb")
             handle.close()
             species = (record.annotations['organism']).replace(' ', '_')
+
+            # Create a new header for each sequence with species and accession
             line_end = line.split('ref|')
             if '[' in line_end[-1]:
                 remove_dup_species = line_end[-1].split('[')
-                new_line = '>' + gene_output + '|' +  str(species) + '|' + remove_dup_species[0] + '\n'
+                new_line = '>' + gene_symbol + '|' +  str(species) + '|' + remove_dup_species[0] + '\n'
             else:
-                new_line = '>' + gene_output + '|' +  str(species) + '|' + line_end[-1]
+                new_line = '>' + gene_symbol + '|' +  str(species) + '|' + line_end[-1]
             fasta_homologues[i] = new_line
         i += 1
 
-    #creating formatted homologues fasta file
-    homologues_file = gene_output + '_formatted_homologues.fasta'
+    # Define the path to the output .fasta file
+    homologues_file = gene_symbol + '_formatted_homologues.fasta'
     homologues_path = os.path.join(path_name, homologues_file)
+
+    # Write the output .fasta file
     with open(homologues_path, 'w') as output_object:
         [output_object.write(line) for line in fasta_homologues]
-    print("Formatted Homologues fasta file created.")
+    print("Formatted homologues fasta file created.")
+
     return homologues_path
 
-#Function 9: Construct an MSA using Clustal Omega
-def construct_MSA(homologues_file, gene_symbol, path_name, email_address):
-    with open(homologues_file,'r') as homologues_object:
+
+def construct_MSA(email_address, path_name, gene_symbol, homologues_path):
+    """Use the formatted FASTA file from Homologene as input to Clustal Omega 
+    to create a multiple sequence alignment. Output the MSA as a text file.
+
+    Args:
+        homologues_path ([file path]): Path to .fasta file containing 
+        homologous protein sequences.
+        gene_symbol ([string]): Relevant human gene symbol for homologous 
+        proteins.
+        path_name ([file path]): Path to directory where output .txt file will
+        be stored.
+        email_address ([string]): Required to access Clustal Omega API.
+
+    Returns:
+        msa [string]: Multiple sequence alignment of homologous protein 
+        sequences.
+    """
+    # Open the .fasta file of homologous protein sequences
+    with open(homologues_path,'r') as homologues_object:
         fasta_transcripts = homologues_object.read()
 
-    #Making request to Clustal Omega to create multiple sequence alignment
+    # Submit request to Clustal Omega
     print("Sending request to Clustal Omega.")
     run = ''
     while not str(run) == '<Response [200]>':
-        run = requests.post('https://www.ebi.ac.uk/Tools/services/rest/clustalo/run', data = {'email':email_address, 'sequence':fasta_transcripts})
-        #Exception Handling if email is invalid
+        run = requests.post(
+            'https://www.ebi.ac.uk/Tools/services/rest/clustalo/run', 
+            data = {'email':email_address, 'sequence':fasta_transcripts}
+            )
+        # Exception Handling to catch if email is invalid
         try:
             run.raise_for_status()
         except requests.exceptions.HTTPError:
-            print('Error whilst submitting query. Please ensure email address is valid.')
-            email_address = input("Please enter a valid email address: ")            
+            print('Error whilst submitting query.',
+            'Please ensure email address is valid.')
+            email_address = input("Please enter a valid email address: ")
+
+    # Decode job ID
     job_id_bytes = run.content
     job_id = job_id_bytes.decode('utf-8')
 
-    #Get the status of submitted Clustal Omega job
-    status_request = requests.get('https://www.ebi.ac.uk/Tools/services/rest/clustalo/status/'+ str(job_id))
+    # Get status of submitted Clustal Omega job
+    status_request = requests.get(
+        'https://www.ebi.ac.uk/Tools/services/rest/clustalo/status/'+ str(job_id)
+        )
     status = (status_request.content).decode('utf-8')
 
-    #Checking status every 10 seconds
-    while status_decoded != "FINISHED":
-        status_request = requests.get('https://www.ebi.ac.uk/Tools/services/rest/clustalo/status/'+ str(job_id))
+    # Check status every 10 seconds
+    while status != "FINISHED":
+        status_request = requests.get(
+            'https://www.ebi.ac.uk/Tools/services/rest/clustalo/status/'+ str(job_id)
+            )
         status = (status_request.content).decode('utf-8')
-        
         print(status)
         if status == "RUNNING":
             time.sleep(10)
 
-    #Retrieving results from Clustal Omega request once completed and writing results to a text file
-    msa_request = requests.get('https://www.ebi.ac.uk/Tools/services/rest/clustalo/result/'+ str(job_id) +'/aln-clustal_num')
+    # Get results from Clustal Omega once completed
+    msa_request = requests.get(
+        'https://www.ebi.ac.uk/Tools/services/rest/clustalo/result/'+ str(job_id) +'/aln-clustal_num'
+        )
     msa = (msa_request.content).decode('utf-8')
+    
+    # Define path to output text file
     msa_file = gene_symbol + '_msa.txt'
     msa_path = os.path.join(path_name, msa_file)
+
+    # Write output text file
     with open(msa_path, 'w') as msa_file_object:
         msa_file_object.write(msa)
     print("Multiple Sequence Alignment text file created.")
 
     return msa
 
-#Main function to call other functions
+
 def main():
-    #input email address required to access Entrez services, check that input contains '@' symbol
+    # Email address is required to access web API services
     email_address = input("Please enter a valid email address: ")
     while "@" not in email_address:
-        print("Services require a valid email address.")
+        print("Web API services require a valid email address.")
         email_address = input("Please enter a valid email address: ")
     
     query_name, path_name = get_query_name()
-    sequence = acquire_input()
-    blast_output = blast_search(sequence, query_name, path_name)
-    list_of_hits = get_blast_hits(blast_output)
-    gene_output = find_best_match(list_of_hits)
-    fasta_record = find_homologues(gene_output)
-    homologues_file = format_fasta(gene_output, fasta_record, path_name)
-    construct_MSA(homologues_file, gene_output, path_name, email_address)
+    query_sequence = acquire_input()
+    blast_output = blast_search(query_name, path_name, query_sequence)
+    blast_closest_hits = get_blast_hits(blast_output)
+    gene_symbol = find_best_match(blast_closest_hits)
+    fasta_record = find_homologues(email_address, gene_symbol)
+    homologues_path = format_fasta(path_name, gene_symbol, fasta_record)
+    construct_MSA(email_address, path_name, gene_symbol, homologues_path)
 
-#Call to main function
+
+# Call to main function
 if __name__ == '__main__':
     main()
