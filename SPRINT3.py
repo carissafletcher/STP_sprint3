@@ -51,7 +51,7 @@ def get_query_name():
 def fasta_check(filename):
     with open(filename, "r") as handle:
         fasta = SeqIO.parse(handle, "fasta")
-        return any(fasta)
+    return any(fasta)
 
 #Function 3: Get query sequence from string or .fasta file
 def acquire_input():
@@ -157,8 +157,6 @@ def find_best_match(list_of_hits):
 
 #Function 7: Identify gene homologues and return protein sequences as .fasta
 def find_homologues(gene_output):
-    
-
     #Search homologene database using gene symbol and Homo sapiens as search terms and retrieve homologene ID
     Entrez.email = email_address
     search_handle = Entrez.esearch(db='homologene', term=(gene_output + '[Gene Name] AND Homo sapiens[Organism]'))
@@ -167,6 +165,7 @@ def find_homologues(gene_output):
     hg_id = search_record['IdList'][0]
     print('Homologene ID: ' + hg_id)
 
+    #Search Homologene using ID number and get list of homologous protein sequence accession numbers
     hg_handle = Entrez.efetch(db='homologene', id = hg_id, rettype = 'homologene', retmode='text')
     hg_record = hg_handle.readlines()
     hg_handle.close()
@@ -178,6 +177,7 @@ def find_homologues(gene_output):
             accession_list.append(accession)
     print('Transcript accession numbers: ', [acs for acs in accession_list])
 
+    #Search Homologene using ID number and get homologue sequences in FASTA format
     fasta_handle = Entrez.efetch(db='homologene', id = hg_id, rettype = 'fasta', retmode='text')
     fasta_record = fasta_handle.read()
     fasta_handle.close()
@@ -190,7 +190,6 @@ def format_fasta(gene_output, fasta_record, path_name):
     clipped_fasta_record = (fasta_record[first_seq:]).strip()
     fasta_file = gene_output + '_raw_homologues.fasta'
     
-
     #creating raw homologues fasta file
     og_fasta_path = os.path.join(path_name, fasta_file)
     with open(og_fasta_path, 'w') as output_object:
@@ -227,7 +226,6 @@ def format_fasta(gene_output, fasta_record, path_name):
 
 #Function 9: Construct an MSA using Clustal Omega
 def construct_MSA(homologues_file, gene_symbol, path_name, email_address):
-    
     with open(homologues_file,'r') as homologues_object:
         fasta_transcripts = homologues_object.read()
 
@@ -271,7 +269,6 @@ def construct_MSA(homologues_file, gene_symbol, path_name, email_address):
 
 #Main function to call other functions
 def main():
-    
     #input email address required to access Entrez services, check that input contains '@' symbol
     email_address = input("Please enter a valid email address: ")
     while "@" not in email_address:
