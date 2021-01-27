@@ -89,7 +89,8 @@ def acquire_input():
     input_type = input('DNA sequence format is (1) string (2) fasta file? ')
     while not ((input_type == '1') or (input_type == '2')):
         print('Please enter either 1 or 2.')
-        input_type = input('DNA sequence format is (1) string (2) fasta file? ')
+        input_type = input(
+            'DNA sequence format is (1) string (2) fasta file? ')
 
     # Format a directly-input sequence
     if input_type == '1':
@@ -135,14 +136,15 @@ def blast_search(query_name, path_name, query_sequence):
     """
     # Submit query sequence to NCBI BLASTN and read results
     print('Querying BLAST - This may take several minutes during peak times.')
-    for i in range(3):
+    for i in range(1,4):
         try:
             print('Querying BLASTN: Attempt ' + str(i))
             result_handle = NCBIWWW.qblast("blastn", "nt", query_sequence)
             break
         except Exception:
-            print('Attempt ' + str(i) + ': Error with request.', Exception)
-            if i == 2:
+            print('Attempt ' + str(i) + ': Error with request.', 
+                str(Exception))
+            if i == 3:
                 print('Unable to access BLASTN. Exiting script.')
                 exit()
     print('BLAST query complete.')
@@ -190,7 +192,8 @@ def get_blast_hits(filepath):
             identity = int(hsp.find('Hsp_identity').text)
         percent_identity = 100 * (identity / length)
 
-        blast_closest_hits.append([gene_description, transcript, percent_identity])
+        blast_closest_hits.append([gene_description, transcript, 
+            percent_identity])
 
     print('There are ' + str(len(blast_closest_hits)) + ' sequence matches.')
 
@@ -248,7 +251,7 @@ def find_best_match(blast_closest_hits):
 
     # If there are no gene symbols identified, 
     elif len(unique_genes) == 0:
-        print('No gene symbol was identified as associated with this sequence.')
+        print('No gene symbol was identified from this sequence.')
         exit()
 
     # Otherwise, the user has to select a gene symbol
@@ -279,7 +282,7 @@ def find_homologues(email_address, gene_symbol):
     """
     # Query Homologene with the gene symbol for the best match
     Entrez.email = email_address
-    for i in range(3):
+    for i in range(1,4):
         try:
             print('Querying Homologene: Attempt ' + str(i))
             search_handle = Entrez.esearch(
@@ -287,8 +290,9 @@ def find_homologues(email_address, gene_symbol):
                 term=(gene_symbol + '[Gene Name] AND Homo sapiens[Organism]'))
             break
         except Exception:
-            print('Attempt ' + str(i) + ': Error with request.', Exception)
-            if i == 2:
+            print('Attempt ' + str(i) + ': Error with request.', 
+                str(Exception))
+            if i == 3:
                 print('Unable to access Homologene. Exiting script.')
                 exit()
     search_record = Entrez.read(search_handle)
@@ -299,7 +303,7 @@ def find_homologues(email_address, gene_symbol):
     print('Homologene ID: ' + hg_id)
 
     # Use the ID to request the Homologene record
-    for i in range(3):
+    for i in range(1,4):
         try:
             print('Querying Homologene: Attempt ' + str(i))
             hg_handle = Entrez.efetch(
@@ -307,8 +311,9 @@ def find_homologues(email_address, gene_symbol):
                 retmode='text')
             break
         except Exception:
-            print('Attempt ' + str(i) + ': Error with request.', Exception)
-            if i == 2:
+            print('Attempt ' + str(i) + ': Error with request.', 
+                str(Exception))
+            if i == 3:
                 print('Unable to access Homologene. Exiting script.')
                 exit()
     hg_record = hg_handle.readlines()
@@ -324,15 +329,16 @@ def find_homologues(email_address, gene_symbol):
     print('Transcript accession numbers: ', [acs for acs in accession_list])
 
     # Use the ID again to request the homologous protein sequences as .fasta
-    for i in range(3):
+    for i in range(1,4):
         try:
             print('Querying Homologene: Attempt ' + str(i))
             fasta_handle = Entrez.efetch(
                 db='homologene', id = hg_id, rettype = 'fasta', retmode='text')
             break
         except Exception:
-            print('Attempt ' + str(i) + ': Error with request.', Exception)
-            if i == 2:
+            print('Attempt ' + str(i) + ': Error with request.', 
+                str(Exception))
+            if i == 3:
                 print('Unable to access Homologene. Exiting script.')
                 exit()
     fasta_record = fasta_handle.read()
@@ -491,11 +497,13 @@ def main():
     query_sequence = acquire_input()
     blast_output = blast_search(query_name, path_name, query_sequence)
     blast_closest_hits = get_blast_hits(blast_output)
+    #blast_closest_hits = get_blast_hits('sall2/sall2_blast_output.xml')
     gene_symbol = find_best_match(blast_closest_hits)
     fasta_record = find_homologues(email_address, gene_symbol)
     homologues_path = format_fasta(path_name, gene_symbol, fasta_record)
     construct_MSA(email_address, path_name, gene_symbol, homologues_path)
-
+    #homologues_path = format_fasta('sall2/', gene_symbol, fasta_record)
+    #construct_MSA(email_address, 'sall2/', gene_symbol, homologues_path)
 
 # Call to main function
 if __name__ == '__main__':
