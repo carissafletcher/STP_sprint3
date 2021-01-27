@@ -135,7 +135,15 @@ def blast_search(query_name, path_name, query_sequence):
     """
     # Submit query sequence to NCBI BLASTN and read results
     print('Querying BLAST - This may take several minutes during peak times.')
-    result_handle = NCBIWWW.qblast("blastn", "nt", query_sequence)
+    for i in range(4):
+        try:
+            result_handle = NCBIWWW.qblast("blastn", "nt", query_sequence)
+            break
+        except Exception:
+            print('Attempt ' + str(i) + ': Error with request.', Exception)
+            if i == 3:
+                print('Unable to access BLASTN. Exiting script.')
+                exit()
     print('BLAST query complete.')
     blast_results = result_handle.read()
     result_handle.close()
@@ -218,12 +226,13 @@ def find_best_match(blast_closest_hits):
     blast_genes = []                             
     for hit in best_matches:
         gene_desc = hit[0]
-        split1 = gene_desc.split('(')
-        split2 = split1[1:]  # take everything after brackets open
-        split3 = split2[0]  # in case of multiple pairs of brackets
-        split4 = split3.split(')')
-        split5 = split4[:1]  # keep only contents before brackets close
-        blast_genes.append(split5[0])
+        if '(' in gene_desc:
+            split1 = gene_desc.split('(')
+            split2 = split1[1:]  # take everything after brackets open
+            split3 = split2[0]  # in case of multiple pairs of brackets
+            split4 = split3.split(')')
+            split5 = split4[:1]  # keep only contents before brackets close
+            blast_genes.append(split5[0])
 
     # Remove duplicate gene symbols from the list
     unique_genes = []
@@ -236,14 +245,20 @@ def find_best_match(blast_closest_hits):
         gene_symbol = unique_genes[0]
         print('Closest gene match: ' + gene_symbol)
 
+    # If there are no gene symbols identified, 
+    elif len(unique_genes) == 0:
+        print('No gene symbol was identified as associated with this sequence.')
+        exit()
+
     # Otherwise, the user has to select a gene symbol
     else:
         print('Multiple possible gene matches: ')
         print([gene for gene in unique_genes])
-        gene_symbol = input('Please select one gene symbol: ')
+        gene_symbol = input('Please select one gene symbol (case-sensitive): ')
         while gene_symbol not in unique_genes:
             print('Selection must be in list above.')
-            gene_symbol = input('Please select one gene symbol: ')
+            gene_symbol = input(
+                'Please select one gene symbol (case-sensitive): ')
 
     return gene_symbol
 
@@ -263,10 +278,17 @@ def find_homologues(email_address, gene_symbol):
     """
     # Query Homologene with the gene symbol for the best match
     Entrez.email = email_address
-    search_handle = Entrez.esearch(
-        db='homologene', 
-        term=(gene_symbol + '[Gene Name] AND Homo sapiens[Organism]')
-        )
+    for i in range(4):
+        try:
+            search_handle = Entrez.esearch(
+                db='homologene', 
+                term=(gene_symbol + '[Gene Name] AND Homo sapiens[Organism]'))
+            break
+        except Exception:
+            print('Attempt ' + str(i) + ': Error with request.', Exception)
+            if i == 3:
+                print('Unable to access Homologene. Exiting script.')
+                exit()
     search_record = Entrez.read(search_handle)
     search_handle.close()
 
@@ -275,9 +297,16 @@ def find_homologues(email_address, gene_symbol):
     print('Homologene ID: ' + hg_id)
 
     # Use the ID to request the Homologene record
-    hg_handle = Entrez.efetch(
-        db='homologene', id = hg_id, rettype = 'homologene', retmode='text'
-        )
+    for i in range(4):
+        try:
+            hg_handle = Entrez.efetch(
+                db='homologene', id = hg_id, rettype = 'homologene', 
+                retmode='text')
+        except Exception:
+            print('Attempt ' + str(i) + ': Error with request.', Exception)
+            if i == 3:
+                print('Unable to access Homologene. Exiting script.')
+                exit()
     hg_record = hg_handle.readlines()
     hg_handle.close()
 
@@ -291,9 +320,15 @@ def find_homologues(email_address, gene_symbol):
     print('Transcript accession numbers: ', [acs for acs in accession_list])
 
     # Use the ID again to request the homologous protein sequences as .fasta
-    fasta_handle = Entrez.efetch(
-        db='homologene', id = hg_id, rettype = 'fasta', retmode='text'
-        )
+    for i in range(4):
+        try:
+            fasta_handle = Entrez.efetch(
+                db='homologene', id = hg_id, rettype = 'fasta', retmode='text')
+        except Exception:
+            print('Attempt ' + str(i) + ': Error with request.', Exception)
+            if i == 3:
+                print('Unable to access Homologene. Exiting script.')
+                exit()
     fasta_record = fasta_handle.read()
     fasta_handle.close()
 
@@ -338,8 +373,7 @@ def format_fasta(path_name, gene_symbol, fasta_record):
         if line[0] == '>':
             split_line = line.split('|')
             handle = Entrez.efetch(
-                db="protein", id=split_line[3], rettype="gb", retmode="text"
-                )
+                db="protein", id=split_line[3], rettype="gb", retmode="text")
             record = SeqIO.read(handle, "gb")
             handle.close()
             species = (record.annotations['organism']).replace(' ', '_')
@@ -393,8 +427,7 @@ def construct_MSA(email_address, path_name, gene_symbol, homologues_path):
     while not str(run) == '<Response [200]>':
         run = requests.post(
             'https://www.ebi.ac.uk/Tools/services/rest/clustalo/run', 
-            data = {'email':email_address, 'sequence':fasta_transcripts}
-            )
+            data = {'email':email_address, 'sequence':fasta_transcripts})
         # Exception Handling to catch if email is invalid
         try:
             run.raise_for_status()
@@ -409,15 +442,15 @@ def construct_MSA(email_address, path_name, gene_symbol, homologues_path):
 
     # Get status of submitted Clustal Omega job
     status_request = requests.get(
-        'https://www.ebi.ac.uk/Tools/services/rest/clustalo/status/'+ str(job_id)
-        )
+        'https://www.ebi.ac.uk/Tools/services/rest/clustalo/status/'
+        + str(job_id))
     status = (status_request.content).decode('utf-8')
 
     # Check status every 10 seconds
     while status != "FINISHED":
         status_request = requests.get(
-            'https://www.ebi.ac.uk/Tools/services/rest/clustalo/status/'+ str(job_id)
-            )
+            'https://www.ebi.ac.uk/Tools/services/rest/clustalo/status/'
+            + str(job_id))
         status = (status_request.content).decode('utf-8')
         print(status)
         if status == "RUNNING":
@@ -425,8 +458,8 @@ def construct_MSA(email_address, path_name, gene_symbol, homologues_path):
 
     # Get results from Clustal Omega once completed
     msa_request = requests.get(
-        'https://www.ebi.ac.uk/Tools/services/rest/clustalo/result/'+ str(job_id) +'/aln-clustal_num'
-        )
+        'https://www.ebi.ac.uk/Tools/services/rest/clustalo/result/'
+        + str(job_id) +'/aln-clustal_num')
     msa = (msa_request.content).decode('utf-8')
     
     # Define path to output text file
