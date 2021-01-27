@@ -20,10 +20,12 @@ Given a query nucleotide sequence in a fasta file:
 9. Construct a multiple sequence alignment using Clustal Omega.
 """
 
+from datetime import datetime  # To record time of BLAST query submission
 import os  # For management of input and output files
 import time  # To enable time delay between query status checks
 import xml.etree.ElementTree as ET  # To enable .xml manipulation
 
+import randfacts  # To alleviate boredom during BLAST searches
 import requests  # To query web services
 import matplotlib.pyplot as plt # To generate figure of phylogenetic tree
 
@@ -90,23 +92,26 @@ def acquire_input():
         query_sequence [string]: Sequence to be queried using BLASTN.
     """
     # User specifies format of query sequence
-    input_type = input('DNA sequence format is (1) string (2) fasta file? ')
+    print('\nIMPORTANT!\nIf your transcript sequence is longer than 1 line,',
+        'please ensure you submit it as a .fasta file.\n')
+    input_type = input('Transcript format is (1) string (2) fasta file? ')
     while not ((input_type == '1') or (input_type == '2')):
         print('Please enter either 1 or 2.')
         input_type = input(
-            'DNA sequence format is (1) string (2) fasta file? ')
+            'Transcript format is (1) string (2) fasta file? ')
 
     # Format a directly-input sequence
     if input_type == '1':
-        string_input = (input('Paste sequence here: ')).upper()
-        query_sequence = (string_input.replace(' ', '')).strip()
-        print('Sequence to query: ' + query_sequence)
+        string_input = input('Paste transcript sequence here: ')
+        upper_case_input = string_input.upper()
+        remove_spaces = (upper_case_input.replace(' ', '')).strip()
+        print('Sequence to query:\n', remove_spaces)
 
         ok_input = [
             'A', 'B', 'C', 'D', 'G', 'H', 'K', 'M', 'N', 'R',
             'S', 'T', 'U', 'V', 'W', 'Y', '-'
             ]  # Characters comprising the degenerate nucleotide code
-        for character in query_sequence:
+        for character in remove_spaces:
             if character not in ok_input:
                 print('Warning, unsupported character: ' + character)  
                 # Warning only, stills runs query
@@ -142,10 +147,14 @@ def blast_search(query_name, path_name, query_sequence):
         output_path [file path]: Path to output .xml file.
     """
     # Submit query sequence to NCBI BLASTN and read results
-    print('Querying BLAST - This may take several minutes during peak times.')
+    print('\nQuerying BLAST - This may take a long time during peak times.')
     for i in range(1,4):
+        print('Querying BLASTN: Attempt ' + str(i))
+        print((datetime.now()).strftime("%Y-%m-%d %H:%M:%S"))
+        print('\n...whilst you\'re waiting, here\'s a randomly-generated',
+            'interesting fact:')
+        print(randfacts.getFact())
         try:
-            print('Querying BLASTN: Attempt ' + str(i))
             result_handle = NCBIWWW.qblast("blastn", "nt", query_sequence)
             break
         except Exception as ex:
@@ -164,7 +173,7 @@ def blast_search(query_name, path_name, query_sequence):
     # Write output file
     with open(output_path, 'w') as save_file:
         save_file.write(blast_results)
-    print("BLAST output xml file created.")
+    print("\nBLAST output xml file created.")
 
     return output_path
 
@@ -262,9 +271,9 @@ def find_best_match(blast_closest_hits):
 
     # Otherwise, the user has to select a gene symbol
     else:
-        print('Multiple possible gene matches: ')
+        print('\nIMPORTANT:\nMultiple possible gene matches: ')
         print([gene for gene in unique_genes])
-        gene_symbol = input('Please select one gene symbol (case-sensitive): ')
+        gene_symbol = input('\nPlease select one gene symbol (case-sensitive): ')
         while gene_symbol not in unique_genes:
             print('Selection must be in list above.')
             gene_symbol = input(
@@ -290,7 +299,7 @@ def find_homologues(email_address, gene_symbol):
     Entrez.email = email_address
     for i in range(1,4):
         try:
-            print('Getting Homologene ID: Attempt ' + str(i))
+            print('\nGetting Homologene ID: Attempt ' + str(i))
             search_handle = Entrez.esearch(
                 db='homologene', 
                 term=(gene_symbol + '[Gene Name] AND Homo sapiens[Organism]'))
@@ -437,7 +446,7 @@ def construct_MSA(email_address, path_name, gene_symbol, homologues_path):
         fasta_transcripts = homologues_object.read()
 
     # Submit request to Clustal Omega
-    print("Sending request to Clustal Omega.")
+    print("\nSending request to Clustal Omega.")
     run = ''
     while not str(run) == '<Response [200]>':
         run = requests.post(
@@ -484,7 +493,7 @@ def construct_MSA(email_address, path_name, gene_symbol, homologues_path):
     # Write output text file
     with open(msa_path, 'w') as msa_file_object:
         msa_file_object.write(msa)
-    print("Multiple Sequence Alignment text file created.")
+    print("\nMultiple Sequence Alignment text file created.")
 
     # Get newick results from Clustal Omega once completed
     newick_request = requests.get(
@@ -522,6 +531,19 @@ def construct_MSA(email_address, path_name, gene_symbol, homologues_path):
 
 
 def main():
+    print("""
+
+    You are using...
+
+            -. .-.   .-. .-.   .-. .-.   .  
+            ||\|||\ /|||\|||\ /|||\|||\ /|
+                *~THE HOMOLOGENATOR~*
+            |/ \|||\|||/ \|||\|||/ \|||\||
+            ~   `-~ `-`   `-~ `-`   `-~ `-
+
+    """)
+    # ASCII art from https://www.asciiart.eu/miscellaneous/dna
+
     # Email address is required to access web API services
     email_address = input("Please enter a valid email address: ")
     while "@" not in email_address:
