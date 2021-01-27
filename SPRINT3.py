@@ -141,9 +141,8 @@ def blast_search(query_name, path_name, query_sequence):
             print('Querying BLASTN: Attempt ' + str(i))
             result_handle = NCBIWWW.qblast("blastn", "nt", query_sequence)
             break
-        except Exception:
-            print('Attempt ' + str(i) + ': Error with request.', 
-                str(Exception))
+        except Exception as ex:
+            print('Error occurred: ', ex.__class__.__name__)
             if i == 3:
                 print('Unable to access BLASTN. Exiting script.')
                 exit()
@@ -284,14 +283,13 @@ def find_homologues(email_address, gene_symbol):
     Entrez.email = email_address
     for i in range(1,4):
         try:
-            print('Querying Homologene: Attempt ' + str(i))
+            print('Getting Homologene ID: Attempt ' + str(i))
             search_handle = Entrez.esearch(
                 db='homologene', 
                 term=(gene_symbol + '[Gene Name] AND Homo sapiens[Organism]'))
             break
-        except Exception:
-            print('Attempt ' + str(i) + ': Error with request.', 
-                str(Exception))
+        except Exception as ex:
+            print('Error occurred: ', ex.__class__.__name__)
             if i == 3:
                 print('Unable to access Homologene. Exiting script.')
                 exit()
@@ -305,14 +303,13 @@ def find_homologues(email_address, gene_symbol):
     # Use the ID to request the Homologene record
     for i in range(1,4):
         try:
-            print('Querying Homologene: Attempt ' + str(i))
+            print('Getting Homologene record: Attempt ' + str(i))
             hg_handle = Entrez.efetch(
                 db='homologene', id = hg_id, rettype = 'homologene', 
                 retmode='text')
             break
-        except Exception:
-            print('Attempt ' + str(i) + ': Error with request.', 
-                str(Exception))
+        except Exception as ex:
+            print('Error occurred: ', ex.__class__.__name__)
             if i == 3:
                 print('Unable to access Homologene. Exiting script.')
                 exit()
@@ -331,13 +328,12 @@ def find_homologues(email_address, gene_symbol):
     # Use the ID again to request the homologous protein sequences as .fasta
     for i in range(1,4):
         try:
-            print('Querying Homologene: Attempt ' + str(i))
+            print('Getting sequences as fasta: Attempt ' + str(i))
             fasta_handle = Entrez.efetch(
                 db='homologene', id = hg_id, rettype = 'fasta', retmode='text')
             break
-        except Exception:
-            print('Attempt ' + str(i) + ': Error with request.', 
-                str(Exception))
+        except Exception as ex:
+            print('Error occurred: ', ex.__class__.__name__)
             if i == 3:
                 print('Unable to access Homologene. Exiting script.')
                 exit()
