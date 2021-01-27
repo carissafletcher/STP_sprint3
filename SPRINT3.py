@@ -305,6 +305,7 @@ def find_homologues(email_address, gene_symbol):
             hg_handle = Entrez.efetch(
                 db='homologene', id = hg_id, rettype = 'homologene', 
                 retmode='text')
+            break
         except Exception:
             print('Attempt ' + str(i) + ': Error with request.', Exception)
             if i == 2:
@@ -328,6 +329,7 @@ def find_homologues(email_address, gene_symbol):
             print('Querying Homologene: Attempt ' + str(i))
             fasta_handle = Entrez.efetch(
                 db='homologene', id = hg_id, rettype = 'fasta', retmode='text')
+            break
         except Exception:
             print('Attempt ' + str(i) + ': Error with request.', Exception)
             if i == 2:
