@@ -109,13 +109,16 @@ def acquire_input():
 
     # Check correct file extension/format for a sequence in a .fasta file
     elif input_type == '2':
-        filename = input('Enter filename: ')
+        filename = input('Enter filename or full path to file: ')
+        while not os.path.isfile(filename):
+            print('File does not exist, please ensure path is correct.')
+            filename = input('Enter filename or full path to file: ')
         while not (filename.endswith('.fasta')):
             print('File must be .fasta type.')
-            filename = input('Enter filename: ')
+            filename = input('Enter filename or full path to file: ')
         while fasta_check(filename) == False:
             print('Data must be in fasta format.')
-            filename = input('Enter filename: ')
+            filename = input('Enter filename or full path to file: ')
         with open(filename,'r') as file_object:
             query_sequence = file_object.read()
 
