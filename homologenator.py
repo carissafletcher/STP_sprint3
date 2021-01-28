@@ -104,14 +104,14 @@ def acquire_input():
     if input_type == '1':
         string_input = input('Paste transcript sequence here: ')
         upper_case_input = string_input.upper()
-        remove_spaces = (upper_case_input.replace(' ', '')).strip()
-        print('Sequence to query:\n', remove_spaces)
+        query_sequence = (upper_case_input.replace(' ', '')).strip()
+        print('Sequence to query:\n', query_sequence)
 
         ok_input = [
             'A', 'B', 'C', 'D', 'G', 'H', 'K', 'M', 'N', 'R',
             'S', 'T', 'U', 'V', 'W', 'Y', '-'
             ]  # Characters comprising the degenerate nucleotide code
-        for character in remove_spaces:
+        for character in query_sequence:
             if character not in ok_input:
                 print('Warning, unsupported character: ' + character)  
                 # Warning only, stills runs query
@@ -153,7 +153,7 @@ def blast_search(query_name, path_name, query_sequence):
         print((datetime.now()).strftime("%Y-%m-%d %H:%M:%S"))
         print('\n...whilst you\'re waiting, here\'s a randomly-generated',
             'interesting fact:')
-        print(randfacts.getFact())
+        print(randfacts.getFact() + "\n")
         try:
             result_handle = NCBIWWW.qblast("blastn", "nt", query_sequence)
             break
