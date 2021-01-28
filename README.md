@@ -41,7 +41,7 @@ python -m pip install -r requirements.txt\
 
 ### **How should this app be used?**
 -If you are in the working directory, the app can be run from the command line with the command 'python homologenator.py'. Depending on your version of Python, you may need to replace 'python' with 'python3'.
--A valid email address must be provided to access for web API services.\
+-A valid email address must be provided for access to the web API services.\
 -A unique user-defined query identifier must be provided in order to create a new folder for output files.\
 -A transcript nucleotide sequence in a .fasta file. Sequences shorter than 1 line can be pasted in directly as a string.\
 -Example sequences have been provided in the example_1.fasta and example_2.fasta files.
@@ -53,7 +53,7 @@ python -m pip install -r requirements.txt\
 -Raw .fasta file of homologous protein sequences from Homologene\
 -Formatted .fasta file of homologous protein sequences from Homologene\
 -Text file containing multiple sequence alignment (generated from homologous protein sequences by Clustal Omega)\
--Text file containing information for phylogenetic tree construction in Newickk format\
+-Text file containing information for phylogenetic tree construction in Newick format\
 -Image file showing phylogenetic tree
 
 
